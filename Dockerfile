@@ -24,9 +24,9 @@ ENV PATH="/root/.local/bin:${PATH}"
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-# Install the package with all dependencies
+# Install the package with all dependencies including Google Drive support
 # Use --no-cache to reduce layer size
-RUN uv pip install --system --no-cache -e .
+RUN uv pip install --system --no-cache -e ".[google_drive]"
 
 # Runtime stage
 FROM python:3.11-slim

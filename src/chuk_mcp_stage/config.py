@@ -60,3 +60,31 @@ class Config:
         - 'auto': Auto-detect based on available services (default)
         """
         return os.getenv("PHYSICS_PROVIDER", "auto").lower()
+
+    @staticmethod
+    def get_google_drive_config() -> dict[str, str] | None:
+        """Get Google Drive OAuth configuration.
+
+        Returns:
+            Dict with client_id, client_secret, redirect_uri or None if not configured
+
+        Environment variables:
+        - GOOGLE_CLIENT_ID: Google OAuth client ID
+        - GOOGLE_CLIENT_SECRET: Google OAuth client secret
+        - GOOGLE_REDIRECT_URI: OAuth callback URL (default: http://localhost:8000/oauth/callback)
+        - OAUTH_SERVER_URL: OAuth server base URL (default: http://localhost:8000)
+        """
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+        if not client_id or not client_secret:
+            return None
+
+        return {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "redirect_uri": os.getenv(
+                "GOOGLE_REDIRECT_URI", "http://localhost:8000/oauth/callback"
+            ),
+            "oauth_server_url": os.getenv("OAUTH_SERVER_URL", "http://localhost:8000"),
+        }

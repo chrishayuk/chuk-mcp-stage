@@ -1,7 +1,7 @@
 """Tests for chuk-mcp-stage server tools."""
 
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 import pytest
 from chuk_mcp_stage.server import (
     stage_create_scene,
@@ -466,7 +466,9 @@ def test_main_http_mode():
     with patch("chuk_mcp_stage.server.run") as mock_run:
         with patch.object(sys, "argv", ["chuk-mcp-stage", "http"]):
             main()
-            mock_run.assert_called_once_with(transport="http", host="0.0.0.0", port=8000)
+            mock_run.assert_called_once_with(
+                transport="http", host="0.0.0.0", port=8000, post_register_hook=ANY
+            )
 
 
 def test_main_http_mode_with_flag():
@@ -476,7 +478,9 @@ def test_main_http_mode_with_flag():
     with patch("chuk_mcp_stage.server.run") as mock_run:
         with patch.object(sys, "argv", ["chuk-mcp-stage", "--http"]):
             main()
-            mock_run.assert_called_once_with(transport="http", host="0.0.0.0", port=8000)
+            mock_run.assert_called_once_with(
+                transport="http", host="0.0.0.0", port=8000, post_register_hook=ANY
+            )
 
 
 def test_main_streamable_mode():

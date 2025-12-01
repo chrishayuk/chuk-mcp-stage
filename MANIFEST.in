@@ -1,0 +1,12 @@
+include README.md
+include LICENSE
+include ARCHITECTURE.md
+include pyproject.toml
+recursive-include src *.py
+recursive-include examples *.py *.sh *.json *.md
+recursive-include docs *.md
+exclude examples/*.pyc
+exclude **/__pycache__
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~

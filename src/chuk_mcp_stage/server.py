@@ -20,7 +20,12 @@ import logging
 import sys
 from typing import Optional
 
-from chuk_mcp_server import run, tool
+from chuk_mcp_server import get_mcp_server, run, tool  # type: ignore[attr-defined]
+
+try:
+    from chuk_mcp_server.oauth.helpers import setup_google_drive_oauth
+except ImportError:
+    setup_google_drive_oauth = None  # type: ignore[assignment]
 
 from .exporters import SceneExporter
 from .models import (
@@ -676,9 +681,18 @@ def main() -> None:
         logging.getLogger("chuk_mcp_server.stdio_transport").setLevel(logging.ERROR)
         logging.getLogger("httpx").setLevel(logging.ERROR)
 
+    # Set up Google Drive OAuth if configured (HTTP mode only)
+    oauth_hook = None
+    if transport == "http" and setup_google_drive_oauth is not None:
+        oauth_hook = setup_google_drive_oauth(get_mcp_server())
+        if oauth_hook:
+            logger.warning(
+                "Google Drive OAuth enabled - set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"
+            )
+
     # Run server with appropriate transport
     if transport == "http":
-        run(transport=transport, host="0.0.0.0", port=8000)  # nosec B104
+        run(transport=transport, host="0.0.0.0", port=8000, post_register_hook=oauth_hook)  # nosec B104
     else:
         run(transport=transport)
 

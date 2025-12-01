@@ -48,3 +48,6 @@ Thumbs.db
 *.log
 .env
 stage_data/
+
+# ai
+.claude

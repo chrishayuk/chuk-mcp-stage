@@ -210,63 +210,149 @@ artifacts = await SceneExporter.export_scene(
 
 ## Data Flow
 
+### Two-Phase Model
+
+chuk-mcp-stage operates in **two distinct phases**:
+
+#### Phase 1: Authoring (Declarative)
+
+"What should exist and where should it be?"
+
+- Define scene graph structure
+- Place objects with transforms
+- Set materials and lighting
+- Define camera shots
+- Bind object IDs to physics body IDs (metadata only)
+
+**No computation happens yet** - this is pure scene composition.
+
+#### Phase 2: Baking (Computational)
+
+"What motion actually happened?"
+
+- Connect to physics simulation (Rapier/chuk-mcp-physics)
+- Sample physics state at target FPS
+- Convert physics data → animation keyframes
+- Store keyframes in VFS
+- Export scene + animations to rendering formats
+
+**Computation happens here** - physics oracle generates the motion data.
+
+---
+
 ### Typical Workflow
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ 1. Create Scene                                         │
-│    stage_create_scene(name="demo")                      │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 2. Define Visual World                                  │
-│    stage_add_object(type="sphere", ...)                 │
-│    stage_add_object(type="plane", ...)                  │
-│    stage_set_environment(lighting="three-point")        │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 3. Add Cinematography                                   │
-│    stage_add_shot(mode="orbit", focus="ball", ...)      │
-│    stage_add_shot(mode="static", position=...)          │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 4. Run Physics (chuk-mcp-physics)                       │
-│    create_simulation()                                  │
-│    add_rigid_body(...)                                  │
-│    step_simulation(steps=600)                           │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 5. Bind Physics → Visuals                               │
-│    stage_bind_physics(object="ball",                    │
-│                       body="rapier://sim/ball")         │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 6. Bake Animation                                       │
-│    stage_bake_simulation(sim_id, fps=60, duration=10)   │
-│    → Keyframes stored in /animations/                   │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 7. Export                                               │
-│    stage_export_scene(format="remotion-project")        │
-│    → Full Remotion project in /export/remotion/         │
-└─────────────────┬───────────────────────────────────────┘
-                  │
-                  ▼
-┌─────────────────────────────────────────────────────────┐
-│ 8. Render (Remotion)                                    │
-│    remotion render → MP4                                │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ AUTHORING PHASE (Declarative)                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 1. Create Scene                                              │
+│    stage_create_scene(name="ball-throw")                     │
+│    → VFS: Creates /scene.json                                │
+│    → Returns: artifact://stage/ball-throw-xyz                │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 2. Define Visual World                                       │
+│    stage_add_object(id="ground", type="plane", ...)          │
+│    stage_add_object(id="ball", type="sphere", y=2, ...)      │
+│    stage_set_environment(lighting="three-point")             │
+│    → Scene graph: {objects: {ground, ball}, env: {...}}      │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 3. Add Cinematography                                        │
+│    stage_add_shot(mode="chase", target="ball", ...)          │
+│    stage_add_shot(mode="static", position=[10,5,10])         │
+│    → Scene graph: {shots: {chase-1, static-1}}               │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 4. Create Physics Simulation (chuk-mcp-physics)              │
+│    create_simulation(gravity_y=-9.81)                        │
+│    add_rigid_body(sim_id, body_id="ball", shape="sphere")    │
+│    → Simulation ready, no motion yet                         │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 5. Bind Physics → Visuals (Metadata Only)                    │
+│    stage_bind_physics(                                       │
+│        object_id="ball",                                     │
+│        physics_body_id="rapier://sim-abc/body-ball"          │
+│    )                                                         │
+│    → Scene graph: ball.physics_binding = "rapier://..."      │
+│    → NO MOTION DATA YET - just a pointer                     │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│ BAKING PHASE (Computational)                                 │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 6. Run Physics Simulation (chuk-mcp-physics)                 │
+│    step_simulation(sim_id, steps=300)  # 5s @ 60 FPS         │
+│    → Physics oracle computes all trajectories                │
+│    → Stored in Rapier service memory/state                   │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 7. Bake Animation (PhysicsBridge)                            │
+│    stage_bake_simulation(                                    │
+│        scene_id="ball-throw-xyz",                            │
+│        simulation_id="sim-abc",                              │
+│        fps=60,                                               │
+│        duration=5.0                                          │
+│    )                                                         │
+│    → PhysicsBridge connects to Rapier service                │
+│    → Samples physics state every 1/60s                       │
+│    → Converts to keyframes:                                  │
+│        {time: 0.016, pos: [x,y,z], rot: [x,y,z,w], vel: ...} │
+│    → VFS: Writes /animations/ball.json                       │
+│    → Scene graph: baked_animations["ball"] = metadata        │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 8. Export (SceneExporter)                                    │
+│    stage_export_scene(                                       │
+│        scene_id="ball-throw-xyz",                            │
+│        format="remotion-project",                            │
+│        output_path="/export/remotion"                        │
+│    )                                                         │
+│    → Reads scene.json from VFS                               │
+│    → Reads /animations/*.json from VFS                       │
+│    → Generates:                                              │
+│        /export/remotion/Composition.tsx                      │
+│        /export/remotion/Root.tsx                             │
+│        /export/remotion/package.json                         │
+│    → Returns artifact URIs (NOT file contents!)              │
+│        {                                                     │
+│          composition: "artifact://.../Composition.tsx",      │
+│          root: "artifact://.../Root.tsx",                    │
+│          package: "artifact://.../package.json"              │
+│        }                                                     │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│ RENDERING PHASE (External - Remotion)                        │
+├──────────────────────────────────────────────────────────────┤
+│                                                               │
+│ 9. Render Video (Outside chuk-mcp-stage)                     │
+│    # User or automation:                                     │
+│    cd artifact://stage/ball-throw-xyz/export/remotion        │
+│    npm install                                               │
+│    npm run build                                             │
+│    → Remotion renders → output.mp4                           │
+│                                                               │
+└──────────────────────────────────────────────────────────────┘
+
+Key Observations:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Authoring creates STRUCTURE (scene graph, bindings)
+2. Physics oracle creates MOTION (trajectories, state)
+3. Baking creates KEYFRAMES (sampled, renderable data)
+4. Export creates CODE (R3F/Remotion components)
+5. Rendering creates MEDIA (MP4, images)
+
+Authoring is declarative. Baking is computational.
 ```
 
 ---

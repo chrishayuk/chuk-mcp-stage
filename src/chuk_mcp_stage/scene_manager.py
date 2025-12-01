@@ -9,6 +9,7 @@ from typing import Optional
 
 from chuk_artifacts import ArtifactStore, NamespaceType, StorageScope
 
+from .config import Config
 from .models import (
     BakedAnimation,
     Environment,
@@ -29,9 +30,26 @@ class SceneManager:
         """Initialize scene manager.
 
         Args:
-            store: ArtifactStore instance. If None, creates a new one.
+            store: ArtifactStore instance. If None, creates a new one with configured providers.
         """
-        self._store = store or ArtifactStore()
+        if store is None:
+            # Get configured providers
+            storage_provider = Config.get_storage_provider()
+            session_provider = Config.get_session_provider()
+
+            logger.info(
+                f"Initializing ArtifactStore with storage_provider={storage_provider}, "
+                f"session_provider={session_provider}"
+            )
+
+            # Create store with configured providers
+            self._store = ArtifactStore(
+                storage_provider=storage_provider,
+                session_provider=session_provider,
+            )
+        else:
+            self._store = store
+
         self._scenes: dict[str, Scene] = {}  # In-memory cache
         self._scene_to_namespace: dict[str, str] = {}  # scene_id -> namespace_id
 

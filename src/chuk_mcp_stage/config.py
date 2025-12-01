@@ -62,6 +62,72 @@ class Config:
         return os.getenv("PHYSICS_PROVIDER", "auto").lower()
 
     @staticmethod
+    def get_storage_provider() -> str:
+        """Get storage provider for chuk-artifacts.
+
+        Returns:
+            Storage provider type (default: 'vfs-filesystem')
+
+        Provider types:
+        - 'vfs-filesystem': VFS-based local filesystem storage (default, works everywhere)
+        - 'vfs-memory': VFS-based in-memory storage (testing only)
+        - 'vfs-s3': VFS-based S3 storage (production, requires AWS credentials)
+        - 'vfs-sqlite': VFS-based SQLite storage
+        - 'memory': Legacy in-memory storage
+        - 'filesystem': Legacy local filesystem storage
+
+        For Google Drive integration:
+        - Use 'vfs-filesystem' (default)
+        - Google Drive is enabled via OAuth when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
+        - chuk-virtual-fs[google_drive] dependency provides the Google Drive VFS provider
+
+        Environment variable:
+        - STORAGE_PROVIDER: Storage provider type
+        """
+        return os.getenv("STORAGE_PROVIDER", "vfs-filesystem")
+
+    @staticmethod
+    def get_session_provider() -> str:
+        """Get session provider for chuk-sessions.
+
+        Returns:
+            Session provider type (default: 'memory')
+
+        Provider types:
+        - 'memory': In-memory session storage (default, good for development)
+        - 'redis': Redis-based session storage (production, requires REDIS_URL)
+
+        Environment variables:
+        - SESSION_PROVIDER: Session provider type
+        - REDIS_URL: Redis connection URL (for redis provider)
+        """
+        return os.getenv("SESSION_PROVIDER", "memory")
+
+    @staticmethod
+    def is_google_drive_enabled() -> bool:
+        """Check if Google Drive integration should be enabled.
+
+        Returns:
+            True if storage provider is vfs-filesystem AND OAuth credentials are configured
+
+        Google Drive is only enabled when:
+        1. Storage provider is 'vfs-filesystem' (default)
+        2. GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set
+        3. chuk-virtual-fs[google_drive] is installed (checked at runtime)
+        """
+        storage_provider = Config.get_storage_provider()
+
+        # Google Drive only works with vfs-filesystem provider
+        if storage_provider != "vfs-filesystem":
+            return False
+
+        # Check if OAuth credentials are configured
+        client_id = os.getenv("GOOGLE_CLIENT_ID")
+        client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+
+        return bool(client_id and client_secret)
+
+    @staticmethod
     def get_google_drive_config() -> dict[str, str] | None:
         """Get Google Drive OAuth configuration.
 
@@ -73,10 +139,22 @@ class Config:
         - GOOGLE_CLIENT_SECRET: Google OAuth client secret
         - GOOGLE_REDIRECT_URI: OAuth callback URL (default: http://localhost:8000/oauth/callback)
         - OAUTH_SERVER_URL: OAuth server base URL (default: http://localhost:8000)
+
+        Note: Google Drive storage is enabled when:
+        1. Storage provider is 'vfs-filesystem' (default)
+        2. OAuth is configured (these env vars are set)
+        3. User authenticates via OAuth
+        4. chuk-virtual-fs[google_drive] is installed
+        5. StorageScope.USER is used (automatic when authenticated)
         """
+        if not Config.is_google_drive_enabled():
+            return None
+
+        # These are guaranteed to be set by is_google_drive_enabled()
         client_id = os.getenv("GOOGLE_CLIENT_ID")
         client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
 
+        # Type checker needs explicit check even though is_google_drive_enabled() validates
         if not client_id or not client_secret:
             return None
 

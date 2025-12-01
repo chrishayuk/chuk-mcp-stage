@@ -1,5 +1,7 @@
 """Pytest configuration."""
 
+pytest_plugins = ("pytest_asyncio",)
+
 
 def pytest_configure(config):
     """Register custom markers."""

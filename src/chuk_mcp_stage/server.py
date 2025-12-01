@@ -20,13 +20,14 @@ import logging
 import sys
 from typing import Optional
 
-from chuk_mcp_server import get_mcp_server, run, tool  # type: ignore[attr-defined]
+from chuk_mcp_server import get_or_create_global_server, run, tool  # type: ignore[attr-defined]
 
 try:
     from chuk_mcp_server.oauth.helpers import setup_google_drive_oauth
 except ImportError:
     setup_google_drive_oauth = None  # type: ignore[assignment]
 
+from .config import Config
 from .exporters import SceneExporter
 from .models import (
     AddObjectResponse,
@@ -93,7 +94,7 @@ async def stage_create_scene(
 
     Tips for LLMs:
         - Scene ID is auto-generated (UUID)
-        - Scenes are stored in chuk-artifacts SESSION scope (ephemeral by default)
+        - Scenes are stored in USER scope (Google Drive) if authenticated, SESSION scope otherwise
         - Use the scene_id for all subsequent operations
         - Typical workflow: create_scene → add_objects → add_shots → export
 
@@ -105,6 +106,9 @@ async def stage_create_scene(
         )
         # Use scene.scene_id for next steps
     """
+    from chuk_artifacts import StorageScope
+    from chuk_mcp_server import get_user_id
+
     from .models import SceneMetadata
 
     manager = get_scene_manager()
@@ -117,8 +121,21 @@ async def stage_create_scene(
     # Create metadata
     metadata = SceneMetadata(author=author, description=description)
 
+    # Determine storage scope and user_id based on authentication
+    user_id = get_user_id()
+    if user_id:
+        # User is authenticated via OAuth - store in USER scope (Google Drive)
+        scope = StorageScope.USER
+        logger.info(f"Creating scene in USER scope for user {user_id}")
+    else:
+        # No authentication - use SESSION scope (ephemeral)
+        scope = StorageScope.SESSION
+        logger.info("Creating scene in SESSION scope (no user authentication)")
+
     # Create scene
-    scene = await manager.create_scene(scene_id=scene_id, name=name, metadata=metadata)
+    scene = await manager.create_scene(
+        scene_id=scene_id, name=name, metadata=metadata, scope=scope, user_id=user_id
+    )
 
     return CreateSceneResponse(scene_id=scene.id, message=f"Scene '{name or scene_id}' created")
 
@@ -681,13 +698,17 @@ def main() -> None:
         logging.getLogger("chuk_mcp_server.stdio_transport").setLevel(logging.ERROR)
         logging.getLogger("httpx").setLevel(logging.ERROR)
 
-    # Set up Google Drive OAuth if configured (HTTP mode only)
+    # Set up Google Drive OAuth if configured (HTTP mode only and storage provider is vfs-filesystem)
     oauth_hook = None
-    if transport == "http" and setup_google_drive_oauth is not None:
-        oauth_hook = setup_google_drive_oauth(get_mcp_server())
+    if (
+        transport == "http"
+        and setup_google_drive_oauth is not None
+        and Config.is_google_drive_enabled()
+    ):
+        oauth_hook = setup_google_drive_oauth(get_or_create_global_server())
         if oauth_hook:
             logger.warning(
-                "Google Drive OAuth enabled - set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET"
+                "Google Drive OAuth enabled - using vfs-filesystem storage with Google Drive integration"
             )
 
     # Run server with appropriate transport

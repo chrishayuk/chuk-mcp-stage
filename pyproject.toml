@@ -1,6 +1,6 @@
 [project]
 name = "chuk-mcp-stage"
-version = "0.2"
+version = "0.2.1"
 description = "MCP server for 3D scene composition, camera control, and physics-to-motion orchestration"
 authors = [
     {name = "Chris Hay", email = "chris@example.com"}

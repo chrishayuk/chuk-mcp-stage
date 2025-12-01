@@ -289,6 +289,10 @@ When Claude Desktop (or any MCP client) connects:
 
 #### Deployment to Fly.io
 
+**✅ OAuth is now configured for https://stage.chukai.io and https://physics.chukai.io**
+
+See [OAUTH_SETUP_COMPLETE.md](OAUTH_SETUP_COMPLETE.md) for details on the production OAuth setup.
+
 For production deployments, set secrets instead of using `.env`:
 
 ```bash
@@ -311,57 +315,86 @@ fly deploy
 **Important**: Update Google Cloud Console with production redirect URI:
 - Add `https://your-app.fly.dev/oauth/callback` to authorized redirect URIs
 
-#### Storage Providers Comparison
+#### Storage Providers
 
-| Provider | Persistence | User Owns Data | Setup Complexity | Cost |
-|----------|-------------|----------------|------------------|------|
-| **Memory** (default) | ❌ Session only | N/A | ✅ Zero | Free |
-| **Google Drive** | ✅ Permanent | ✅ Yes | ⚠️ OAuth setup | Free (user's Drive) |
-| **S3** | ✅ Permanent | ❌ Provider-owned | ⚠️ AWS credentials | $$ (your infrastructure) |
+chuk-mcp-stage supports multiple storage backends - see **[STORAGE_CONFIGURATION.md](STORAGE_CONFIGURATION.md)** for complete details.
+
+**Quick Comparison**:
+
+| Provider | Persistence | Cloud Sync | OAuth Required | Setup | Best For |
+|----------|-------------|------------|----------------|-------|----------|
+| **vfs-filesystem** (default) | ✅ Local | ❌ | ❌ | Zero | Local dev |
+| **vfs-filesystem + OAuth** | ✅ Persistent | ✅ Google Drive | ✅ | Medium | Production (small) |
+| **vfs-s3** | ✅ Persistent | ✅ S3 | ❌ | Medium | Production (large) |
+| **vfs-memory** | ❌ RAM only | ❌ | ❌ | Zero | Testing only |
+
+**Environment Variables**:
+```bash
+# Storage provider selection (default: vfs-filesystem)
+STORAGE_PROVIDER=vfs-filesystem
+
+# Session metadata storage (default: memory)
+SESSION_PROVIDER=memory
+
+# For Redis sessions (production)
+SESSION_PROVIDER=redis
+REDIS_URL=redis://localhost:6379/0
+
+# For AWS S3 storage
+STORAGE_PROVIDER=vfs-s3
+AWS_ACCESS_KEY_ID=xxx
+AWS_SECRET_ACCESS_KEY=xxx
+AWS_S3_BUCKET=chuk-artifacts
+AWS_REGION=us-east-1
+```
+
+See **[STORAGE_CONFIGURATION.md](STORAGE_CONFIGURATION.md)** for:
+- Detailed provider comparison
+- Migration guides
+- Production best practices
+- Troubleshooting
 
 #### Where Your Scenes Live
 
-**With Memory (default)**:
-- Scenes exist only during the session
-- Lost when server restarts
+**With vfs-filesystem (default)**:
+```
+~/.chuk-artifacts/
+└── grid/
+    └── {sandbox_id}/
+        └── {session_id}/
+            └── {namespace_id}/
+                ├── scene.json
+                ├── animations/
+                └── export/
+```
 
-**With Google Drive**:
+**With Google Drive (vfs-filesystem + OAuth)**:
 ```
 Google Drive
-└── CHUK/
-    └── stage/
-        ├── scene-abc123/
-        │   ├── scene.json
-        │   ├── baked_animations.json
-        │   └── exports/
-        └── scene-def456/
-            └── scene.json
+└── chuk-artifacts/
+    └── {user_id}/
+        └── {namespace_id}/
+            ├── scene.json
+            ├── animations/
+            │   └── cannonball.json
+            └── export/
+                └── remotion/
 ```
 
-Users can:
-- View scenes in Google Drive web UI
-- Share scene folders with collaborators
-- Download/backup scenes locally
-- Access from any device
-
-**Environment Variables**:
-
-```bash
-# Use Google Drive provider
-VFS_PROVIDER=google_drive
-
-# Path to credentials JSON (defaults to ~/.chuk/google_drive_credentials.json)
-GOOGLE_DRIVE_CREDENTIALS_FILE=~/.chuk/google_drive_credentials.json
-
-# Or provide credentials directly as JSON string
-GOOGLE_DRIVE_CREDENTIALS='{"token": "...", "refresh_token": "...", ...}'
-
-# Root folder in Drive (default: CHUK)
-GOOGLE_DRIVE_ROOT_FOLDER=CHUK
-
-# Cache TTL in seconds (default: 60)
-GOOGLE_DRIVE_CACHE_TTL=60
+**With AWS S3 (vfs-s3)**:
 ```
+s3://your-bucket/
+└── grid/
+    └── {sandbox_id}/
+        └── {session_id}/
+            └── {namespace_id}/
+                ├── scene.json
+                └── animations/
+```
+
+**Storage Scope Behavior**:
+- **SESSION scope** (unauthenticated) → Local filesystem only, ephemeral
+- **USER scope** (authenticated) → Google Drive (if OAuth enabled) or S3, persistent
 
 ---
 

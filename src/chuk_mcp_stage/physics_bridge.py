@@ -90,12 +90,11 @@ class PhysicsBridge:
                 steps = 600  # Default 10 seconds at 60 FPS
 
             # Call physics server to get trajectory
+            # Rapier service endpoint: POST /simulations/{sim_id}/bodies/{body_id}/trajectory
             try:
                 response = await self._client.post(
-                    "/record_trajectory",
+                    f"/simulations/{simulation_id}/bodies/{body_id}/trajectory",
                     json={
-                        "sim_id": simulation_id,
-                        "body_id": body_id,
                         "steps": steps,
                         "dt": 1.0 / fps,
                     },

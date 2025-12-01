@@ -190,6 +190,15 @@ cd rapier-service && cargo run --release
 
 See **[chuk-mcp-physics README](https://github.com/chrishayuk/chuk-mcp-physics)** for complete physics integration guide.
 
+**What's New in chuk-mcp-physics v0.3.1:**
+- **52 physics tools** (expanded from 27) - Now covers ~50% of common physics use cases
+- **Rotational dynamics**: Torque, moment of inertia, angular momentum calculations
+- **Springs & oscillations**: Simple harmonic motion, damped oscillations, pendulums
+- **Circular motion**: Orbital mechanics, centripetal force, escape velocity
+- **Advanced collisions**: 3D elastic/inelastic collisions with coefficient of restitution
+- **Conservation laws**: Energy and momentum verification for simulations
+- **Fluid dynamics**: Drag, buoyancy, terminal velocity, underwater motion
+
 ---
 
 ### Google Drive OAuth Storage (HTTP Mode)

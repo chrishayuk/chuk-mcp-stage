@@ -115,3 +115,117 @@ def test_get_physics_provider_lowercase():
         assert provider == "rapier"
     finally:
         del os.environ["PHYSICS_PROVIDER"]
+
+
+def test_get_google_drive_config_not_configured():
+    """Test Google Drive config when credentials not set."""
+    # Clear all Google Drive environment variables
+    for key in [
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_REDIRECT_URI",
+        "OAUTH_SERVER_URL",
+    ]:
+        if key in os.environ:
+            del os.environ[key]
+
+    config = Config.get_google_drive_config()
+    assert config is None
+
+
+def test_get_google_drive_config_missing_client_id():
+    """Test Google Drive config returns None when client_id is missing."""
+    # Clear client_id but set client_secret
+    if "GOOGLE_CLIENT_ID" in os.environ:
+        del os.environ["GOOGLE_CLIENT_ID"]
+    os.environ["GOOGLE_CLIENT_SECRET"] = "test-secret"
+
+    try:
+        config = Config.get_google_drive_config()
+        assert config is None
+    finally:
+        del os.environ["GOOGLE_CLIENT_SECRET"]
+
+
+def test_get_google_drive_config_missing_client_secret():
+    """Test Google Drive config returns None when client_secret is missing."""
+    # Set client_id but clear client_secret
+    os.environ["GOOGLE_CLIENT_ID"] = "test-client-id"
+    if "GOOGLE_CLIENT_SECRET" in os.environ:
+        del os.environ["GOOGLE_CLIENT_SECRET"]
+
+    try:
+        config = Config.get_google_drive_config()
+        assert config is None
+    finally:
+        del os.environ["GOOGLE_CLIENT_ID"]
+
+
+def test_get_google_drive_config_with_defaults():
+    """Test Google Drive config with minimal configuration (uses defaults)."""
+    os.environ["GOOGLE_CLIENT_ID"] = "test-client-id.apps.googleusercontent.com"
+    os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+
+    # Clear optional variables to test defaults
+    for key in ["GOOGLE_REDIRECT_URI", "OAUTH_SERVER_URL"]:
+        if key in os.environ:
+            del os.environ[key]
+
+    try:
+        config = Config.get_google_drive_config()
+        assert config is not None
+        assert config["client_id"] == "test-client-id.apps.googleusercontent.com"
+        assert config["client_secret"] == "test-client-secret"
+        assert config["redirect_uri"] == "http://localhost:8000/oauth/callback"
+        assert config["oauth_server_url"] == "http://localhost:8000"
+    finally:
+        del os.environ["GOOGLE_CLIENT_ID"]
+        del os.environ["GOOGLE_CLIENT_SECRET"]
+
+
+def test_get_google_drive_config_with_custom_values():
+    """Test Google Drive config with all custom values."""
+    os.environ["GOOGLE_CLIENT_ID"] = "custom-client-id"
+    os.environ["GOOGLE_CLIENT_SECRET"] = "custom-secret"
+    os.environ["GOOGLE_REDIRECT_URI"] = "https://example.com/callback"
+    os.environ["OAUTH_SERVER_URL"] = "https://oauth.example.com"
+
+    try:
+        config = Config.get_google_drive_config()
+        assert config is not None
+        assert config["client_id"] == "custom-client-id"
+        assert config["client_secret"] == "custom-secret"
+        assert config["redirect_uri"] == "https://example.com/callback"
+        assert config["oauth_server_url"] == "https://oauth.example.com"
+    finally:
+        for key in [
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REDIRECT_URI",
+            "OAUTH_SERVER_URL",
+        ]:
+            if key in os.environ:
+                del os.environ[key]
+
+
+def test_get_google_drive_config_partial_custom():
+    """Test Google Drive config with partial custom values."""
+    os.environ["GOOGLE_CLIENT_ID"] = "partial-client-id"
+    os.environ["GOOGLE_CLIENT_SECRET"] = "partial-secret"
+    os.environ["GOOGLE_REDIRECT_URI"] = "https://custom.redirect.com/auth"
+    # Don't set OAUTH_SERVER_URL - should use default
+
+    if "OAUTH_SERVER_URL" in os.environ:
+        del os.environ["OAUTH_SERVER_URL"]
+
+    try:
+        config = Config.get_google_drive_config()
+        assert config is not None
+        assert config["client_id"] == "partial-client-id"
+        assert config["client_secret"] == "partial-secret"
+        assert config["redirect_uri"] == "https://custom.redirect.com/auth"
+        assert config["oauth_server_url"] == "http://localhost:8000"  # Default
+    finally:
+        for key in ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"]:
+            if key in os.environ:
+                del os.environ[key]

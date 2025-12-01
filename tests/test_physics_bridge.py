@@ -99,11 +99,9 @@ async def test_bake_simulation_with_duration():
             assert "body1" in result
             assert "body2" in result
 
-            # Verify first call arguments
+            # Verify first call arguments - updated for new Rapier API
             first_call = mock_post.call_args_list[0]
-            assert first_call[0][0] == "/record_trajectory"
-            assert first_call[1]["json"]["sim_id"] == "sim-001"
-            assert first_call[1]["json"]["body_id"] == "body1"
+            assert first_call[0][0] == "/simulations/sim-001/bodies/body1/trajectory"
             assert first_call[1]["json"]["steps"] == 300  # 5 seconds * 60 fps
             assert first_call[1]["json"]["dt"] == 1.0 / 60
 

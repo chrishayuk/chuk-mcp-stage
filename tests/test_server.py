@@ -3,17 +3,19 @@
 import sys
 from unittest.mock import patch, MagicMock, ANY
 import pytest
-from chuk_mcp_stage.server import (
-    stage_create_scene,
-    stage_add_object,
-    stage_set_environment,
-    stage_add_shot,
-    stage_get_shot,
-    stage_bind_physics,
-    stage_export_scene,
-    stage_get_scene,
-    stage_bake_simulation,
-)
+from chuk_mcp_stage import server
+
+# Import unwrapped versions of tool functions for direct testing
+# The @tool decorator wraps async functions, so we need __wrapped__
+stage_create_scene = server.stage_create_scene.__wrapped__
+stage_add_object = server.stage_add_object.__wrapped__
+stage_set_environment = server.stage_set_environment.__wrapped__
+stage_add_shot = server.stage_add_shot.__wrapped__
+stage_get_shot = server.stage_get_shot.__wrapped__
+stage_bind_physics = server.stage_bind_physics.__wrapped__
+stage_export_scene = server.stage_export_scene.__wrapped__
+stage_get_scene = server.stage_get_scene.__wrapped__
+stage_bake_simulation = server.stage_bake_simulation.__wrapped__
 
 
 @pytest.mark.asyncio

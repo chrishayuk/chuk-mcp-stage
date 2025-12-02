@@ -20,7 +20,7 @@ import logging
 import sys
 from typing import Optional
 
-from chuk_mcp_server import get_or_create_global_server, run, tool  # type: ignore[attr-defined]
+from chuk_mcp_server import get_or_create_global_server, requires_auth, run, tool  # type: ignore[attr-defined]
 
 try:
     from chuk_mcp_server.oauth.helpers import setup_google_drive_oauth
@@ -73,11 +73,14 @@ def get_scene_manager() -> SceneManager:
 # ============================================================================
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_create_scene(
     name: Optional[str] = None,
     author: Optional[str] = None,
     description: Optional[str] = None,
+    _external_access_token: Optional[str] = None,  # Injected by OAuth middleware
+    _user_id: Optional[str] = None,  # Injected by OAuth middleware
 ) -> CreateSceneResponse:
     """Create a new 3D scene for composition.
 
@@ -140,6 +143,7 @@ async def stage_create_scene(
     return CreateSceneResponse(scene_id=scene.id, message=f"Scene '{name or scene_id}' created")
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_add_object(
     scene_id: str,
@@ -252,6 +256,7 @@ async def stage_add_object(
     return AddObjectResponse(object_id=object_id, scene_id=scene_id)
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_set_environment(
     scene_id: str,
@@ -296,6 +301,7 @@ async def stage_set_environment(
 # ============================================================================
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_add_shot(
     scene_id: str,
@@ -393,6 +399,7 @@ async def stage_add_shot(
     return AddShotResponse(shot_id=shot_id, scene_id=scene_id, duration=duration)
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_get_shot(scene_id: str, shot_id: str) -> GetShotResponse:
     """Get shot details from a scene.
@@ -414,6 +421,7 @@ async def stage_get_shot(scene_id: str, shot_id: str) -> GetShotResponse:
 # ============================================================================
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_bind_physics(
     scene_id: str, object_id: str, physics_body_id: str
@@ -477,6 +485,7 @@ async def stage_bind_physics(
     )
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_bake_simulation(
     scene_id: str,
@@ -592,6 +601,7 @@ async def stage_bake_simulation(
 # ============================================================================
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_export_scene(
     scene_id: str, format: str = "r3f-component", output_path: Optional[str] = None
@@ -642,6 +652,7 @@ async def stage_export_scene(
     )
 
 
+@requires_auth()
 @tool  # type: ignore[arg-type]
 async def stage_get_scene(scene_id: str) -> GetSceneResponse:
     """Get complete scene data.
